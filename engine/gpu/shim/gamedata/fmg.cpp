@@ -33,6 +33,10 @@ std::unordered_map<std::int32_t, std::string> ParseFmg(Span b) {
 }
 
 std::unordered_map<std::int32_t, std::string> ReadGoodsNames(const std::string& game_root) {
+    return ReadItemFmg(game_root, "アイテム名");
+}
+
+std::unordered_map<std::int32_t, std::string> ReadItemFmg(const std::string& game_root, const std::string& fmg_name_part) {
     namespace fs = std::filesystem;
     std::vector<std::string> langs = {"engus", "enggb"};
     std::error_code ec;
@@ -48,7 +52,7 @@ std::unordered_map<std::int32_t, std::string> ReadGoodsNames(const std::string& 
         try {
             const Bytes file = ReadMaybeDcx(p.string());
             for (const BndEntry& e : ParseBnd4(file)) {
-                if (e.name.size() >= 4 && e.name.compare(e.name.size() - 4, 4, ".fmg") == 0 && e.name.find("アイテム名") != std::string::npos) {
+                if (e.name.size() >= 4 && e.name.compare(e.name.size() - 4, 4, ".fmg") == 0 && e.name.find(fmg_name_part) != std::string::npos) {
                     return ParseFmg(Span(file).Sub(static_cast<std::int64_t>(e.offset), e.size));
                 }
             }

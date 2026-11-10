@@ -110,6 +110,12 @@ std::vector<Field> Layout(Span b) {
 
 }  // namespace
 
+std::vector<ParamField> ParamLayout(Span paramdef) {
+    std::vector<ParamField> out;
+    for (const Field& f : Layout(paramdef)) out.push_back({f.name, f.type, f.off, f.bit, f.width});
+    return out;
+}
+
 ParamTable ParseParam(Span param, Span paramdef) {
     const std::vector<Field> lay = Layout(paramdef);
     ParamTable t;

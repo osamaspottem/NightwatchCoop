@@ -20,4 +20,8 @@ std::unordered_map<std::int32_t, std::string> ParseFmg(Span b);
 /// read.
 std::unordered_map<std::int32_t, std::string> ReadGoodsNames(const std::string& game_root);
 
+/// The strings of the item.msgbnd FMG whose name contains `fmg_name_part` (e.g. "防具名", the armor names), from the
+/// same language search as ReadGoodsNames. Empty when none can be read.
+std::unordered_map<std::int32_t, std::string> ReadItemFmg(const std::string& game_root, const std::string& fmg_name_part);
+
 }  // namespace bbdata

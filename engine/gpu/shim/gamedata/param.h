@@ -15,6 +15,18 @@ namespace bbdata {
 class ParamTable;
 ParamTable ParseParam(Span param, Span paramdef);
 
+/// One field of a PARAMDEF row layout: byte offset in the row, value type ("u8".."f32", "raw" for
+/// dummy / string bytes), bit (-1: whole value) and width (bits for a bitfield, else the byte count).
+struct ParamField {
+    std::string name;
+    std::string type;
+    std::int64_t off = 0;
+    int bit = -1;
+    int width = 0;
+};
+/// The row layout of a paramdef (fields in order; the same layout ParseParam reads with).
+std::vector<ParamField> ParamLayout(Span paramdef);
+
 /// All rows of one param. Integer fields (bitfields included) hold their value; an f32 field holds its bit
 /// pattern; dummy / string / unknown-typed fields are absent. A field the paramdef does not have reads as
 /// `dflt` (the party tooling's r.get(name, 0)).
