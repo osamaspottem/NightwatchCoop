@@ -18,6 +18,7 @@
 #include "rebirth.h"
 #include "render_guard.h"
 #include "trophy_sync.h"
+#include "transmog.h"
 #include "widescreen.h"
 #include "../input/input.h"
 #include "../party/lamp_travel.h"
@@ -63,6 +64,7 @@ std::int64_t __attribute__((sysv_abi)) OnFrame(std::uint64_t, const std::uint64_
     else coop::lamptravel::Tick();
     BbGameMenu::Poll();
     ChangeAppearance::Tick();
+    Transmog::Tick();
     Rebirth::Tick();
     Options::Tick();
     BbInput::Tick();
