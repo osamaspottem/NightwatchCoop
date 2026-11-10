@@ -291,10 +291,21 @@ bool ApplyOne(std::int32_t id, std::int32_t look, bool sounds) {
 }
 
 Clock::time_point g_last_apply{};
-Clock::time_point g_last_refresh{};
+struct Refresh {
+    std::uint32_t target = 0, other = 0;
+    int phase = 0;
+    Clock::time_point at{};
+    int tries = 0;
+    bool gave = false;  // the bare piece was given for the swap: take it away afterwards
+    Refresh() = default;
+    Refresh(std::uint32_t t, std::uint32_t o, int p, Clock::time_point a) : target(t), other(o), phase(p), at(a) {}
+};
+Refresh g_refresh[kSlots];
 std::map<std::int32_t, std::int32_t> g_applied;  // what the rows hold now (to put back removed looks)
 
 }  // namespace
+
+void RefreshTick();
 
 void Tick() {
     if (g_load == 0) {
@@ -307,7 +318,11 @@ void Tick() {
     const coop::GameSnapshot s = coop::ReadGameState(false);
     g_have_player = s.world_up;
     if (!s.world_up || s.loading) return;
-    for (int k = 0; k < kSlots; ++k) g_wearing[k] = coop::EquippedSlotId(kFirstEquipSlot + k);
+    RefreshTick();
+    for (int k = 0; k < kSlots; ++k) {
+        // While a swap is under way the slot holds the other piece: show (and save to) the real one.
+        g_wearing[k] = g_refresh[k].target ? g_refresh[k].target : coop::EquippedSlotId(kFirstEquipSlot + k);
+    }
 
     const auto now = Clock::now();
     bool dirty;
@@ -346,14 +361,78 @@ void Tick() {
         g_applied[id] = look;
     }
     if (changed.empty()) return;
-    // An equipped piece changed: the game's own equip of the same piece rebuilds the model.
-    if (now - g_last_refresh < std::chrono::milliseconds(300) && !dirty) return;
+    // An equipped piece changed: the game rebuilds the model only when the slot's item changes, so
+    // another owned piece of the slot goes on for a moment, then the piece again (RefreshTick).
     for (int k = 0; k < kSlots; ++k) {
         const std::uint32_t w = g_wearing[k];
         if (!w || std::find(changed.begin(), changed.end(), std::int32_t(w)) == changed.end()) continue;
-        const bool ok = coop::EquipSlotItem(kFirstEquipSlot + k, coop::kItemProtector, w);
-        Log("%s %u: look applied, model refresh %s", kSlotNames[k], w, ok ? "done" : "FAILED (take it off and on)");
-        g_last_refresh = now;
+        g_refresh[k] = {w, 0, 0, now};
+    }
+}
+
+/// Takes away the bare armor piece given for a swap (an unequipped inventory entry of it).
+void RemoveGiven(std::uint32_t id) {
+    for (const coop::InventoryEntry& e : coop::InventoryEntries()) {
+        if (e.item != (coop::kItemProtector | id) || coop::HandleEquipped(e.handle)) continue;
+        const bool ok = coop::RemoveInventoryIndex(e.index);
+        Log("naked piece %u taken back out of the inventory: %s", id, ok ? "ok" : "FAILED");
+        return;
+    }
+}
+
+void RefreshTick() {
+    const auto now = Clock::now();
+    for (int k = 0; k < kSlots; ++k) {
+        Refresh& r = g_refresh[k];
+        if (!r.target) continue;
+        const int slot = kFirstEquipSlot + k;
+        if (r.phase == 0) {
+            // Naked first: the slot's bare row (900000 + slot * 1000) goes on for a moment. When the
+            // player holds none, EquipSlotItem gives one; it is taken away again once the piece is back.
+            const std::uint32_t bare = std::uint32_t(g_data.bare[k]);
+            std::uint32_t via = 0;
+            if (bare) {
+                const bool held = coop::ItemCount(coop::kItemProtector, bare) > 0;
+                if (coop::EquipSlotItem(slot, coop::kItemProtector, bare) && coop::EquippedSlotId(slot) == bare) {
+                    via = bare;
+                    r.gave = !held;
+                } else {
+                    Log("%s %u: could not switch to naked (row %u); trying another piece", kSlotNames[k], r.target, bare);
+                    if (!held) RemoveGiven(bare);
+                }
+            }
+            if (!via) {
+                // Fallback: another piece of this slot in the inventory.
+                for (const coop::InventoryEntry& e : coop::InventoryEntries()) {
+                    if ((e.item & 0xf0000000u) != coop::kItemProtector) continue;
+                    const std::int32_t id = std::int32_t(e.item & 0x0fffffffu);
+                    if (std::uint32_t(id) == r.target) continue;
+                    const auto it = g_data.by_id.find(id);
+                    if (it != g_data.by_id.end() && it->second->slot == k) { via = std::uint32_t(id); break; }
+                }
+                if (!via || !coop::EquipSlotItem(slot, coop::kItemProtector, via)) {
+                    const bool ok = coop::EquipSlotItem(slot, coop::kItemProtector, r.target);
+                    Log("%s %u: look applied; no way to swap the model (refresh %s; take it off and on)", kSlotNames[k],
+                        r.target, ok ? "tried" : "FAILED");
+                    r = {};
+                    continue;
+                }
+            }
+            r.other = via;
+            r.phase = 1;
+            r.at = now;
+        } else if (r.phase == 1 && now - r.at >= std::chrono::milliseconds(120)) {
+            const bool ok = coop::EquipSlotItem(slot, coop::kItemProtector, r.target) &&
+                            coop::EquippedSlotId(slot) == r.target;
+            Log("%s %u: look applied, model refreshed (via %u%s) %s", kSlotNames[k], r.target, r.other,
+                r.other == std::uint32_t(g_data.bare[k]) ? ", naked" : "", ok ? "ok" : "FAILED");
+            if (!ok) {
+                // Try once more next tick rather than leaving the swap on.
+                if (++r.tries < 5) { r.at = now; continue; }
+            }
+            if (r.gave) RemoveGiven(r.other);
+            r = {};
+        }
     }
 }
 
