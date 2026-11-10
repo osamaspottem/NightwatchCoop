@@ -27,6 +27,7 @@
 #include "video_core/renderer_vulkan/vk_optiscaler.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "map/map_page.h"
+#include "engine/transmog.h"
 
 #ifdef _WIN32
 #pragma GCC diagnostic push
@@ -2150,6 +2151,14 @@ void Menu() {
                     ImGui::EndChild();
                     ImGui::EndTabItem();
                 }
+            }
+            // Transmog: armor looks (engine/transmog.h); not in L2 / R2 cycling or search.
+            if (ImGui::BeginTabItem("Transmog###tabtransmog")) {
+                if (ImGui::BeginChild("##transmog", page, ImGuiChildFlags_NavFlattened)) {
+                    BbEngine::Transmog::DrawPage();
+                }
+                ImGui::EndChild();
+                ImGui::EndTabItem();
             }
             // The map (step 4b): only with baked maps (BB_MAP_DIR); not in L2 / R2 cycling or search.
             if (BbMapPage::Available() &&
