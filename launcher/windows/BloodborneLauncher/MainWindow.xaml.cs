@@ -102,6 +102,14 @@ namespace BloodborneLauncher
             {
                 TitleUpdate.Visibility = ws.Update != null ? Visibility.Visible : Visibility.Collapsed;
                 if (ws.Update != null) TitleUpdateText.Text = L.F($"Update {ws.Update.Tag}");
+                // A newer release opens the update prompt by itself, once per launcher run, with the warning that
+                // older builds lose online play (0.3.0 beta 2). Not while the game runs; the button stays.
+                if (!_updatePrompted && ws.Update is { } update && update.IsNewerThan(Updater.Current, Updater.CurrentBeta) &&
+                    !ws.Game.Running)
+                {
+                    _updatePrompted = true;
+                    _ = InstallUpdateAsync(urgent: true);
+                }
             };
 
             Loaded += async (_, _) =>
@@ -999,13 +1007,16 @@ namespace BloodborneLauncher
             }
         }
 
-        /// <summary>Asks, downloads the newer launcher, swaps it in and restarts.</summary>
-        public async Task InstallUpdateAsync()
+        private bool _updatePrompted;
+
+        /// <summary>Asks, downloads the newer launcher (and engine), swaps it in and restarts. `urgent`: opened by
+        /// the update check itself, with the warning that older builds lose online play.</summary>
+        public async Task InstallUpdateAsync(bool urgent = false)
         {
             var ws = Workspace.Current;
             if (ws.Update is not { } release) return;
             if (await PackageCheck(() => Updater.NeedsPackageAsync(release)) is { } package)
-                await InstallAsync(release, package);
+                await InstallAsync(release, package, urgent: urgent);
         }
 
         /// <summary>Whether an update needs the whole package, or null (logged) when the release manifest
@@ -1047,7 +1058,7 @@ namespace BloodborneLauncher
 
         private bool _updating;
 
-        private async Task InstallAsync(Updater.Release release, bool package, bool chosen = false)
+        private async Task InstallAsync(Updater.Release release, bool package, bool chosen = false, bool urgent = false)
         {
             if (_updating) return;
             var ws = Workspace.Current;
@@ -1082,7 +1093,11 @@ namespace BloodborneLauncher
                            : "") +
                        (notes.Length > 0 ? $"\n\n{(chosen && older ? L.T("This version's notes") : L.T("What's new"))}:\n" + notes : "");
             var verb = chosen ? L.T("Switch") : L.T("Update");
-            if (!Prompt.Confirm(L.F($"{verb} to {release.Name}?"), body, L.F($"{verb} now")))
+            if (urgent)
+                body = L.T("Please update. Older versions will not be supported for online play in the future: hosts and players on the new version will not be able to play with you, and bugs reported from an old version cannot be looked at.") +
+                       "\n\n" + body;
+            if (!Prompt.Confirm(urgent ? L.F($"Important update: {release.Name}") : L.F($"{verb} to {release.Name}?"), body,
+                    L.F($"{verb} now")))
                 return;
 
             TitleUpdate.Visibility = Visibility.Visible;

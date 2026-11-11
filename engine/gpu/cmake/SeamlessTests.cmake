@@ -534,6 +534,13 @@ target_include_directories(weapon-clip-groups-test PRIVATE ..)
 set_target_properties(weapon-clip-groups-test PROPERTIES INTERPROCEDURAL_OPTIMIZATION OFF)
 add_test(NAME weapon-clip-groups-test COMMAND weapon-clip-groups-test)
 
+# Nightwatch 0.3.0 feature sounds (start/features.h, shim/party/sounds_rules.h). ninja -C out/gpu sounds-test
+add_executable(sounds-test EXCLUDE_FROM_ALL ../tests/test_sounds.cpp)
+target_compile_options(sounds-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
+target_include_directories(sounds-test PRIVATE ..)
+set_target_properties(sounds-test PROPERTIES INTERPROCEDURAL_OPTIMIZATION OFF)
+add_test(NAME sounds-test COMMAND sounds-test)
+
 # Navmesh test walker (shim/party/nav_walk.h). ninja -C out/gpu nav-walk-test
 add_executable(nav-walk-test EXCLUDE_FROM_ALL ../tests/test_nav_walk.cpp)
 target_compile_options(nav-walk-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
@@ -597,7 +604,7 @@ foreach(target IN LISTS all_targets)
     endif()
 endforeach()
 add_custom_target(seamless-tests DEPENDS ${party_tests} party-soak party-host-harness auto-hud-test gamedata-test)
-add_dependencies(seamless-tests boot-watch-test start-host-only-test hit-effects-test)
+add_dependencies(seamless-tests boot-watch-test start-host-only-test hit-effects-test weapon-clip-groups-test sounds-test)
 
 target_link_libraries(party-soak PRIVATE ws2_32 iphlpapi ole32 oleaut32 crypt32 synchronization winmm)
 target_link_libraries(party-host-harness PRIVATE ws2_32 iphlpapi ole32 oleaut32 crypt32 synchronization winmm)
@@ -706,6 +713,13 @@ target_compile_options(gc-policy-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
 add_test(NAME gc-policy-test COMMAND gc-policy-test)
 add_dependencies(seamless-tests gc-policy-test)
 
+# The WAIT_REG_MEM can-never-pass rule (video_core/amdgpu/wait_reg_mem_logic.h; visy 5d7918142).
+add_executable(wait-reg-mem-test EXCLUDE_FROM_ALL ../tests/test_wait_reg_mem.cpp)
+target_include_directories(wait-reg-mem-test PRIVATE ..)
+target_compile_options(wait-reg-mem-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
+add_test(NAME wait-reg-mem-test COMMAND wait-reg-mem-test)
+add_dependencies(seamless-tests wait-reg-mem-test)
+
 # Offensive-name filter (visy 0.7.8, party/name_filter.cpp): shared vectors with scripts/namefilter.py.
 add_executable(name-filter-test EXCLUDE_FROM_ALL ../tests/test_name_filter.cpp shim/party/name_filter.cpp)
 target_compile_options(name-filter-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
@@ -732,8 +746,14 @@ set(bb_engine_tests pipeline-cache-blob-test image-overlap-test pipeline-archive
     engine-menu-memory-test rebirth-cost-test pc-input-test widescreen-test)
 # They share the GPU, so they run one at a time; motion-shader-test takes ~10 min. scene-resolution,
 # taa-shader and camera-motion open Vulkan device 0 and crash when it is gone (a laptop's dGPU off).
+# The high-quality motion blur against the game's own on a GPU (Lantern test_motion_blur.cpp).
+add_executable(motion-blur-shader-test EXCLUDE_FROM_ALL ../tests/test_motion_blur.cpp)
+target_include_directories(motion-blur-shader-test PRIVATE ${SHADER_INCLUDE})
+target_compile_options(motion-blur-shader-test PRIVATE -UNDEBUG -Wall -Werror)
+target_link_libraries(motion-blur-shader-test PRIVATE Vulkan::Vulkan)
+add_dependencies(motion-blur-shader-test host_shaders)
 set(bb_gpu_tests scene-resolution-test taa-shader-test camera-motion-test indirect-clamp-test
-    hdr-native-shader-test motion-shader-test)
+    hdr-native-shader-test motion-shader-test motion-blur-shader-test)
 foreach(target IN LISTS bb_engine_tests bb_gpu_tests)
     add_test(NAME ${target} COMMAND ${target})
     add_dependencies(seamless-tests ${target})
@@ -747,6 +767,13 @@ target_include_directories(texture-quality-test PRIVATE shim)
 set_target_properties(texture-quality-test PROPERTIES INTERPROCEDURAL_OPTIMIZATION OFF)
 add_test(NAME texture-quality-test COMMAND texture-quality-test)
 add_dependencies(seamless-tests texture-quality-test)
+
+add_executable(scene-proxy-release-test EXCLUDE_FROM_ALL ../tests/test_scene_proxy_release.cpp)
+target_compile_options(scene-proxy-release-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
+target_include_directories(scene-proxy-release-test PRIVATE shadps4)
+set_target_properties(scene-proxy-release-test PROPERTIES INTERPROCEDURAL_OPTIMIZATION OFF)
+add_test(NAME scene-proxy-release-test COMMAND scene-proxy-release-test)
+add_dependencies(seamless-tests scene-proxy-release-test)
 # visy 0.8.0: NpSignaling alive check (shim/net/np_sig_alive.h), H5 look sync rules (shim/party/look_sync_rules.h),
 # six-seat patch set (shim/party/party_sixp.h).
 foreach(t np-sig-alive look-sync party-sixp)
@@ -765,3 +792,18 @@ target_include_directories(crash-guards-test PRIVATE shim)
 set_target_properties(crash-guards-test PROPERTIES INTERPROCEDURAL_OPTIMIZATION OFF)
 add_test(NAME crash-guards-test COMMAND crash-guards-test)
 add_dependencies(seamless-tests crash-guards-test)
+
+# Shader cache read-ahead thread count (shadps4/video_core/cache_read_ahead_rules.h).
+add_executable(cache-read-ahead-test EXCLUDE_FROM_ALL ../tests/test_cache_read_ahead.cpp)
+target_compile_options(cache-read-ahead-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
+target_include_directories(cache-read-ahead-test PRIVATE shadps4)
+add_test(NAME cache-read-ahead-test COMMAND cache-read-ahead-test)
+add_dependencies(seamless-tests cache-read-ahead-test)
+
+# Shadow map sizes (engine/graphics.cpp; Lantern 4889a8a8b test, without the cascade overlap).
+add_executable(native-local-shadows-test EXCLUDE_FROM_ALL ../tests/test_native_local_shadows.cpp
+    shim/engine/graphics.cpp shim/engine/engine_hooks.cpp shim/bbport_settings.cpp shim/bbport_menu_i18n.cpp)
+target_include_directories(native-local-shadows-test PRIVATE shim)
+target_compile_options(native-local-shadows-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
+add_test(NAME native-local-shadows-test COMMAND native-local-shadows-test)
+add_dependencies(seamless-tests native-local-shadows-test)

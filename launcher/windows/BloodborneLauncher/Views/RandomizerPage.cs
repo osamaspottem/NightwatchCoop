@@ -61,6 +61,8 @@ namespace BloodborneLauncher.Views
                 o => o.ShadowsSummons, (o, b) => o with { ShadowsSummons = b });
             Bool(enemies, SymbolRegular.Crown24, L.T("Include chalice dungeon enemies"), L.T("The regular enemies of the Chalice Dungeons, such as Merciless Watchers, Keepers of the Old Lords and Gravekeeper Scorpions, can replace enemies in the main game. Chalice bosses are not included (they have their own option under Bosses). They always give the echoes and drops of the enemy they replace, whatever Echoes and drops says. The dungeons themselves don't change. Making the world takes a little longer."),
                 o => o.ChaliceEnemies, (o, b) => o with { ChaliceEnemies = b });
+            Bool(enemies, SymbolRegular.Lightbulb24, L.T("Include Winter Lanterns"), L.T("Whether Winter Lanterns can replace other enemies. They inflict Frenzy from a distance just by seeing you, often before you see them, and from up high where you can't reach them. Off, they never turn up anywhere new; the ones the game places itself can still be replaced by other enemies. The Brain of Mensis never moves either way."),
+                o => !o.NoWinterLanterns, (o, b) => o with { NoWinterLanterns = !b });
             var exclude = SmallButton(L.T("None"), SymbolRegular.Prohibited24, (_, _) => PickExcluded());
             Add(Card(SymbolRegular.Prohibited24, L.T("Never use these enemies"), L.T("Enemies the randomizer will never place anywhere."), exclude, out _), enemies);
             _rows.Add((exclude, () => exclude.Content = ExcludeSummary(_o.Exclude), null));
@@ -120,9 +122,9 @@ namespace BloodborneLauncher.Views
                 o => o.Bosses, (o, b) => o with { Bosses = b });
 
             Subheading(bosses, L.T("Fights"));
-            var fightHint = L.T("Only matters when bosses are randomized.");
+            var fightHint = L.T("This fight normally has several bosses at once. \"One boss only\" puts a single boss alone in the room; \"A boss for each\" gives every one its own boss. Only matters when bosses are randomized.");
             Bool(bosses, SymbolRegular.ArrowSplit24, L.T("Randomize second phase"),
-                L.T("Father Gascoigne, Ludwig and the Orphan of Kos are the only bosses that change into a second form. With this on, that second form is a random boss instead, wherever they end up. Gascoigne switches at 34 % health, Ludwig and the Orphan at 50 %."),
+                L.T("Father Gascoigne, Ludwig and the Orphan of Kos are the only bosses that change into a second form. With this on, they always turn into another boss at that point, one that fights nowhere else in the world, and that boss never changes again. Two chalice bosses join the pool for this, even when chalice bosses are off. With this off, one of the three in an arena that isn't its own fights its first phase only, and the fight ends when that phase dies."),
                 o => o.SecondStage, (o, b) => o with { SecondStage = b }, null, () => _o.Bosses);
             Bool(bosses, SymbolRegular.ArrowSwap24, L.T("Include Coiled Host (Nocturne boss)"),
                 L.T("Needs Nocturne v2.0.0 or later among the ticked mods below, which adds the Coiled Host as the Shadows of Yharnam's second phase; without it this row is greyed out and does nothing. With this on, the Coiled Host can turn up as the boss of another fight, and after the Shadows die a random boss comes out in his place."),
