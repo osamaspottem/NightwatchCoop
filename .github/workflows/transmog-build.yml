@@ -1,4 +1,6 @@
 name: Transmog engine build
+# Builds engine\out (bb-probe.exe and friends) for Windows with the Transmog tab, from this repository.
+# Run it from the Actions tab ("Run workflow"); download the artifact when it finishes.
 on:
   workflow_dispatch:
 
@@ -51,7 +53,7 @@ jobs:
           export CC=clang CXX=clang++
           BB_PGO=off bash build.sh || { tail -n 200 out/gpu-build.log || true; exit 1; }
 
-      - name: Collect engine out
+      - name: Collect engine\out
         shell: msys2 {0}
         run: |
           set -e
@@ -64,6 +66,7 @@ jobs:
             test -f "$exe" || continue
             ldd "$exe" | awk '{print $3}' | grep -iE '/clang64/bin/.*\.dll$' | while read -r dll; do cp -f "$dll" ../../artifact/engine/out/; done
           done
+          ls -l ../../artifact/engine/out
 
       - uses: actions/upload-artifact@v4
         with:
